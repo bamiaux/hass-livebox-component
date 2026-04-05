@@ -103,8 +103,8 @@ class LiveboxFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
             except (RetrieveFailed, HttpRequestFailed) as err:
                 _LOGGER.warning("Fail to connect to the Livebox: %s", err)
                 errors["base"] = "cannot_connect"
-            except AiosysbusException:
-                _LOGGER.exception("Unknown error connecting to the Livebox")
+            except AiosysbusException as err:
+                _LOGGER.warning("Unknown error connecting to the Livebox: %s", err)
                 errors["base"] = "unknown"
             else:
                 if (sn := infos.get("status", {}).get("SerialNumber")) is not None:
