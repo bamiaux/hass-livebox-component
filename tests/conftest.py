@@ -158,6 +158,7 @@ def mock_router(request) -> Iterator[MagicMock]:
             return_value=api["VoiceService.async_get_calllist"]
         )
         instance.voiceservice.async_ring = AsyncMock()
+        instance.voiceservice.async_clear_calllist = AsyncMock()
         instance.nemo.async_lucky_addr_address_lan = AsyncMock(
             return_value=api["NeMo.async_lucky_addr_address::lan"]
         )
