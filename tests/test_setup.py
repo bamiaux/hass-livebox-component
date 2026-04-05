@@ -1,27 +1,17 @@
 """Tests pour l'intégration Bbox2 utilisant config_entries."""
 
-from unittest.mock import AsyncMock, MagicMock
+from types import SimpleNamespace
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from homeassistant.config_entries import SOURCE_USER, ConfigEntry, ConfigEntryState
+from homeassistant.config_entries import ConfigEntry, ConfigEntryState
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
-from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.livebox.const import (
     CALLID,
-    CONF_DISPLAY_DEVICES,
-    CONF_LAN_TRACKING,
-    CONF_TRACKING_TIMEOUT,
-    CONF_WIFI_TRACKING,
-    DEFAULT_DISPLAY_DEVICES,
-    DEFAULT_LAN_TRACKING,
-    DEFAULT_TRACKING_TIMEOUT,
-    DEFAULT_WIFI_TRACKING,
     DOMAIN,
 )
-
-from .const import MOCK_USER_INPUT
 
 
 @pytest.mark.parametrize("AIOSysbus", ["3", "5", "7", "7.1", "7.2"], indirect=True)
@@ -96,26 +86,20 @@ async def test_remove_call_missed_service_rejects_multiple_entries(
 ) -> None:
     """Test the missed-call service refuses ambiguous multi-entry calls."""
 
-    second_entry = MockConfigEntry(
-        domain=DOMAIN,
-        source=SOURCE_USER,
-        data=MOCK_USER_INPUT,
-        unique_id="987654321098765",
-        options={
-            CONF_WIFI_TRACKING: DEFAULT_WIFI_TRACKING,
-            CONF_LAN_TRACKING: DEFAULT_LAN_TRACKING,
-            CONF_TRACKING_TIMEOUT: DEFAULT_TRACKING_TIMEOUT,
-            CONF_DISPLAY_DEVICES: DEFAULT_DISPLAY_DEVICES,
-        },
-        title="Livebox Y (987654321098765)",
-    )
-    second_entry.add_to_hass(hass)
-
     await hass.config_entries.async_setup(config_entry.entry_id)
-    await hass.config_entries.async_setup(second_entry.entry_id)
     await hass.async_block_till_done()
 
-    with pytest.raises(HomeAssistantError):
+    assert config_entry.state == ConfigEntryState.LOADED
+
+    second_coordinator = SimpleNamespace(api=SimpleNamespace())
+
+    with (
+        patch(
+            "custom_components.livebox._async_loaded_coordinators",
+            return_value=[config_entry.runtime_data, second_coordinator],
+        ),
+        pytest.raises(HomeAssistantError),
+    ):
         await hass.services.async_call(
             DOMAIN,
             "remove_call_missed",
