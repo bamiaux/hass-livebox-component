@@ -41,6 +41,30 @@ def auto_enable_custom_integrations(enable_custom_integrations):
     yield
 
 
+@pytest.fixture(autouse=True)
+def disable_ssdp_sockets() -> Iterator[None]:
+    """Prevent the Home Assistant SSDP dependency from opening real sockets."""
+    with (
+        patch(
+            "homeassistant.components.ssdp.scanner.Scanner.async_start",
+            new=AsyncMock(),
+        ),
+        patch(
+            "homeassistant.components.ssdp.scanner.Scanner.async_stop",
+            new=AsyncMock(),
+        ),
+        patch(
+            "homeassistant.components.ssdp.server.Server.async_start",
+            new=AsyncMock(),
+        ),
+        patch(
+            "homeassistant.components.ssdp.server.Server.async_stop",
+            new=AsyncMock(),
+        ),
+    ):
+        yield
+
+
 @pytest.fixture(name="AIOSysbus")
 def mock_router(request) -> Iterator[MagicMock]:
     """Mock a successful connection."""
