@@ -1,9 +1,6 @@
 """Constants for the Livebox component."""
 
 DOMAIN = "livebox"
-COORDINATOR = "coordinator"
-UNSUB_LISTENER = "unsubscribe_listener"
-LIVEBOX_API = "api"
 PLATFORMS = [
     "sensor",
     "binary_sensor",
@@ -12,8 +9,6 @@ PLATFORMS = [
     "device_tracker",
     "calendar",
 ]
-
-TEMPLATE_SENSOR = "Orange Livebox"
 
 DEFAULT_USERNAME = "admin"
 DEFAULT_HOST = "192.168.1.1"
