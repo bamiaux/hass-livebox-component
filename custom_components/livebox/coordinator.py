@@ -21,6 +21,7 @@ from .const import (
     CONF_DISPLAY_DEVICES,
     CONF_LAN_TRACKING,
     CONF_USE_TLS,
+    CONF_VERIFY_TLS,
     CONF_WIFI_TRACKING,
     DEFAULT_DISPLAY_DEVICES,
     DEFAULT_LAN_TRACKING,
@@ -63,6 +64,7 @@ class LiveboxDataUpdateCoordinator(DataUpdateCoordinator):
             host=self.config_entry.data[CONF_HOST],
             port=self.config_entry.data[CONF_PORT],
             use_tls=self.config_entry.data.get(CONF_USE_TLS, False),
+            verify_tls=self.config_entry.data.get(CONF_VERIFY_TLS, True),
         )
 
     async def _async_update_data(self) -> dict[str, Any]:
