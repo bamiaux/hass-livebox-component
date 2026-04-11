@@ -72,8 +72,18 @@ class LiveboxDataUpdateCoordinator(DataUpdateCoordinator):
         try:
             # Mandatory information
             infos = await self.async_get_infos()
-            self.unique_id = infos["SerialNumber"]
-            match infos["ProductClass"]:
+            if not isinstance(infos, dict):
+                raise UpdateFailed("Livebox device info response is not a mapping")
+
+            serial_number = infos.get("SerialNumber")
+            product_class = infos.get("ProductClass")
+            if not isinstance(serial_number, str) or not serial_number:
+                raise UpdateFailed("Livebox device info is missing SerialNumber")
+            if not isinstance(product_class, str) or not product_class:
+                raise UpdateFailed("Livebox device info is missing ProductClass")
+
+            self.unique_id = serial_number
+            match product_class:
                 case "Livebox 3":
                     self.model = 3
                 case "Livebox 4":
@@ -90,6 +100,8 @@ class LiveboxDataUpdateCoordinator(DataUpdateCoordinator):
                     self.model = 5656  # Sagemcom f@st 5656
                 case "Livebox Nautilus":
                     self.model = 7.2
+                case _:
+                    self.model = None
             # Optionals
             wifi_tracking = self.config_entry.options.get(
                 CONF_WIFI_TRACKING, DEFAULT_WIFI_TRACKING
