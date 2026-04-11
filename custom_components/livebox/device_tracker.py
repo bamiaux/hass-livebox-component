@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timedelta
+from time import monotonic
 from typing import Any, cast
 
 from homeassistant.components.device_tracker.config_entry import ScannerEntity
@@ -95,7 +95,7 @@ class LiveboxDeviceScannerEntity(  # pyrefly: ignore[inconsistent-inheritance]
         self._device = device
         self._device_key = cast(str | None, device.get("Key"))
         self._via_device = coordinator.get_parent_device_identifier(self._device_key)
-        self._old_status = datetime.today()
+        self._disconnect_deadline: float = 0.0
         self._attr_is_connected = device.get("Active", False)
         self._attr_source_type = SourceType.ROUTER
         self._attr_mac_address = self._device_key
@@ -153,7 +153,7 @@ class LiveboxDeviceScannerEntity(  # pyrefly: ignore[inconsistent-inheritance]
                     "band": self._device.get("OperatingFrequencyBand"),
                     "signal_strength": self._device.get("SignalStrength"),
                     "signal_quality": signal_quality,
-                    "frenquency_band": self._device.get("OperatingFrequencyBand"),
+                    "frequency_band": self._device.get("OperatingFrequencyBand"),
                     "connection": "wifi"
                     if iname not in ["wlguest2", "wlguest5"]
                     else "guestwifi",
@@ -201,10 +201,12 @@ class LiveboxDeviceScannerEntity(  # pyrefly: ignore[inconsistent-inheritance]
             CONF_TRACKING_TIMEOUT, DEFAULT_TRACKING_TIMEOUT
         )
         status = self._device.get("Active", False)
+        now = monotonic()
         if status is True:
-            self._old_status = datetime.today() + timedelta(seconds=timeout_tracking)
-        if status is False and self._old_status > datetime.today():
-            _LOGGER.debug("%s will be disconnected at %s", self.name, self._old_status)
+            self._disconnect_deadline = now + timeout_tracking
+        if status is False and self._disconnect_deadline > now:
+            remaining = round(self._disconnect_deadline - now, 1)
+            _LOGGER.debug("%s will be disconnected in %ss", self.name, remaining)
             return True
         _LOGGER.debug("Is Connected: %s", status)
         return status

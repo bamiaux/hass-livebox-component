@@ -1,6 +1,5 @@
 """The tests for the bbox component."""
 
-from datetime import datetime
 from types import SimpleNamespace
 from typing import Any, cast
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -34,12 +33,10 @@ async def test_device_tracker(
     # Disable device PC-408
     AIOSysbus.__devices["status"][69]["Active"] = False
     AIOSysbus.__devices["status"][69]["IPAddress"] = None
-    with (
-        patch("custom_components.livebox.device_tracker.datetime") as mock_datetime,
+    with patch(
+        "custom_components.livebox.device_tracker.monotonic",
+        return_value=10**12,
     ):
-        mock_datetime.today.return_value = datetime(9999, 1, 1, 12, 0, 0)
-        mock_datetime.side_effect = lambda *a, **kw: datetime(*a, **kw)
-
         # Trigger a refresh of the coordinator
         coordinator = config_entry.runtime_data
         await coordinator.async_request_refresh()
