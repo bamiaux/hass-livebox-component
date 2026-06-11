@@ -24,6 +24,7 @@ from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity import EntityCategory, EntityDescription
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.util import slugify
 
 from . import LiveboxConfigEntry
 from .const import DOMAIN, DOWNLOAD_ICON, PHONE_ICON, UPLOAD_ICON
@@ -91,6 +92,36 @@ def get_closure_value_fn(path: str) -> Callable[..., Any]:
 def _normalize_device_key(device_key: str) -> str:
     """Return a stable entity key fragment for a device key."""
     return device_key.lower().replace(":", "_")
+
+
+def _normalize_lan_key(name: str, index: int) -> str:
+    """Return a stable entity key fragment for a LAN interface."""
+    return f"{slugify(name) or 'interface'}_{index}"
+
+
+def _get_lan_item_value_fn(index: int, path: str, default: Any = None) -> Callable:
+    """Return a sensor value function for a LAN interface field."""
+    return lambda data: find_item(data, f"lan.{index}.{path}", default)
+
+
+def _count_associated_devices(value: Any) -> int | None:
+    """Return the number of associated Wi-Fi clients when the API provides it."""
+    if isinstance(value, dict):
+        return len(value)
+    if isinstance(value, list):
+        return len(value)
+    return None
+
+
+def _is_physical_ethernet_interface(item: dict[str, Any]) -> bool:
+    """Return whether a LAN item looks like a physical Ethernet port."""
+    if item.get("type") != "Ethernet":
+        return False
+    name = item.get("name", "")
+    if not isinstance(name, str) or not name.upper().startswith("ETH"):
+        return False
+    extra_attributes = item.get("extra_attributes", {})
+    return isinstance(extra_attributes.get("current_bitrate"), (int, float))
 
 
 def _get_wireless_device_value_fn(
@@ -446,7 +477,67 @@ async def async_setup_entry(
             )
         )
 
-    for description in SENSOR_TYPES + sensor_stats:
+    lan_diagnostics = []
+    for index, item in enumerate(coordinator.data.get("lan", [])):
+        name = item.get("name", "Unknown")
+        if not isinstance(name, str):
+            name = "Unknown"
+        key = _normalize_lan_key(name, index)
+
+        if item.get("type") == "Wireless":
+            lan_diagnostics.append(
+                LiveboxSensorEntityDescription(
+                    key=f"wifi_{key}_channel",
+                    name=f"{name} Channel",
+                    value_fn=_get_lan_item_value_fn(index, "extra_attributes.channel"),
+                    native_unit_of_measurement=None,
+                    state_class=SensorStateClass.MEASUREMENT,
+                    entity_category=EntityCategory.DIAGNOSTIC,
+                    entity_registry_enabled_default=False,
+                    attrs={
+                        "status": _get_lan_item_value_fn(index, "status"),
+                        "ssid": _get_lan_item_value_fn(index, "extra_attributes.ssid"),
+                        "last_change": _get_lan_item_value_fn(
+                            index, "extra_attributes.last_change"
+                        ),
+                        "associated_devices_count": lambda data, idx=index: (
+                            _count_associated_devices(
+                                find_item(
+                                    data,
+                                    f"lan.{idx}.extra_attributes.associated_devices",
+                                )
+                            )
+                        ),
+                    },
+                )
+            )
+
+        if _is_physical_ethernet_interface(item):
+            lan_diagnostics.append(
+                LiveboxSensorEntityDescription(
+                    key=f"ethernet_{key}_current_bitrate",
+                    name=f"{name} Current Bitrate",
+                    value_fn=_get_lan_item_value_fn(
+                        index, "extra_attributes.current_bitrate"
+                    ),
+                    native_unit_of_measurement=UnitOfDataRate.MEGABITS_PER_SECOND,
+                    state_class=SensorStateClass.MEASUREMENT,
+                    device_class=SensorDeviceClass.DATA_RATE,
+                    entity_category=EntityCategory.DIAGNOSTIC,
+                    entity_registry_enabled_default=False,
+                    attrs={
+                        "status": _get_lan_item_value_fn(index, "status"),
+                        "port_state": _get_lan_item_value_fn(
+                            index, "extra_attributes.port_state"
+                        ),
+                        "last_change": _get_lan_item_value_fn(
+                            index, "extra_attributes.last_change"
+                        ),
+                    },
+                )
+            )
+
+    for description in SENSOR_TYPES + sensor_stats + lan_diagnostics:
         if description.key in ["up", "down"] and linktype in ["gpon", "sfp"]:
             continue
         entities.append(LiveboxSensor(coordinator, description))

@@ -8,6 +8,7 @@ import homeassistant.helpers.entity_registry as er
 import pytest
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from pytest_homeassistant_custom_component.common import load_json_object_fixture
 
@@ -200,3 +201,126 @@ async def test_device_metric_sensors_are_created_for_wifi_clients(
     assert sensors["aa_bb_cc_dd_ee_ff_downlink_rate"].device_info["identifiers"] == {
         ("livebox", "AA:BB:CC:DD:EE:FF")
     }
+
+
+async def test_lan_diagnostic_sensors_are_created(
+    hass: HomeAssistant,
+    config_entry: ConfigEntry,
+) -> None:
+    """Test LAN diagnostics expose Wi-Fi radios and Ethernet ports."""
+    coordinator = cast(
+        LiveboxDataUpdateCoordinator,
+        SimpleNamespace(
+            unique_id="LIVEBOX",
+            config_entry=SimpleNamespace(
+                data={"host": "192.168.1.1", "port": 80},
+                options={},
+            ),
+            signal_device_new="livebox-LIVEBOX-device-new",
+            get_parent_device_identifier=lambda _device_key: ("livebox", "LIVEBOX"),
+            data={
+                "devices": {},
+                "lan": [
+                    {
+                        "name": "2.4GHz (primary)",
+                        "status": True,
+                        "type": "Wireless",
+                        "extra_attributes": {
+                            "channel": 6,
+                            "ssid": "Livebox",
+                            "last_change": "2026-06-11T18:40:13Z",
+                            "associated_devices": {
+                                "1": {"MACAddress": "AA:BB:CC:DD:EE:FF"},
+                                "2": {"MACAddress": "11:22:33:44:55:66"},
+                            },
+                        },
+                    },
+                    {
+                        "name": "2.4GHz (primary)",
+                        "status": False,
+                        "type": "Wireless",
+                        "extra_attributes": {
+                            "channel": 11,
+                            "ssid": "Livebox Guest",
+                            "last_change": "2026-06-11T18:41:13Z",
+                            "associated_devices": None,
+                        },
+                    },
+                    {
+                        "name": "ETH0",
+                        "status": True,
+                        "type": "Ethernet",
+                        "extra_attributes": {
+                            "current_bitrate": 2500,
+                            "last_change": "2026-06-11T19:38:36Z",
+                            "port_state": "forwarding",
+                        },
+                    },
+                    {
+                        "name": "ETH3",
+                        "status": False,
+                        "type": "Ethernet",
+                        "extra_attributes": {
+                            "current_bitrate": 0,
+                            "last_change": "2026-04-14T22:27:52Z",
+                            "port_state": "disabled",
+                        },
+                    },
+                    {
+                        "name": "Living-Room-1",
+                        "status": True,
+                        "type": "Ethernet",
+                        "extra_attributes": {
+                            "current_bitrate": None,
+                            "last_change": "2026-04-14T22:28:07Z",
+                            "port_state": None,
+                        },
+                    },
+                ],
+            },
+        ),
+    )
+    config_entry.runtime_data = coordinator
+
+    entities: list[LiveboxSensor] = []
+
+    def _add_entities(
+        new_entities: list[LiveboxSensor], update_before_add: bool = False
+    ) -> None:
+        del update_before_add
+        entities.extend(new_entities)
+
+    await async_setup_entry(
+        hass, config_entry, cast(AddEntitiesCallback, _add_entities)
+    )
+
+    sensors = {entity.entity_description.key: entity for entity in entities}
+
+    primary = sensors["wifi_2_4ghz_primary_0_channel"]
+    secondary = sensors["wifi_2_4ghz_primary_1_channel"]
+    eth0 = sensors["ethernet_eth0_2_current_bitrate"]
+    eth3 = sensors["ethernet_eth3_3_current_bitrate"]
+
+    assert primary.native_value == 6
+    assert primary.extra_state_attributes == {
+        "status": True,
+        "ssid": "Livebox",
+        "last_change": "2026-06-11T18:40:13Z",
+        "associated_devices_count": 2,
+    }
+    assert primary.entity_category is EntityCategory.DIAGNOSTIC
+    assert secondary.native_value == 11
+    secondary_attrs = secondary.extra_state_attributes
+    assert secondary_attrs is not None
+    assert secondary_attrs["associated_devices_count"] is None
+    assert eth0.native_value == 2500
+    assert eth0.extra_state_attributes == {
+        "status": True,
+        "port_state": "forwarding",
+        "last_change": "2026-06-11T19:38:36Z",
+    }
+    assert eth3.native_value == 0
+    eth3_attrs = eth3.extra_state_attributes
+    assert eth3_attrs is not None
+    assert eth3_attrs["port_state"] == "disabled"
+    assert "ethernet_living_room_1_4_current_bitrate" not in sensors
