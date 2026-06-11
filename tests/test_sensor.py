@@ -247,6 +247,17 @@ async def test_lan_diagnostic_sensors_are_created(
                         },
                     },
                     {
+                        "name": "2.4GHz ()",
+                        "status": True,
+                        "type": "Wireless",
+                        "extra_attributes": {
+                            "channel": 11,
+                            "ssid": "Livebox",
+                            "last_change": "2026-06-11T19:38:44Z",
+                            "associated_devices": None,
+                        },
+                    },
+                    {
                         "name": "ETH0",
                         "status": True,
                         "type": "Ethernet",
@@ -264,6 +275,16 @@ async def test_lan_diagnostic_sensors_are_created(
                             "current_bitrate": 0,
                             "last_change": "2026-04-14T22:27:52Z",
                             "port_state": "disabled",
+                        },
+                    },
+                    {
+                        "name": "eth0",
+                        "status": True,
+                        "type": "Ethernet",
+                        "extra_attributes": {
+                            "current_bitrate": 1000,
+                            "last_change": "2026-04-14T22:28:14Z",
+                            "port_state": None,
                         },
                     },
                     {
@@ -298,8 +319,8 @@ async def test_lan_diagnostic_sensors_are_created(
 
     primary = sensors["wifi_2_4ghz_primary_0_channel"]
     secondary = sensors["wifi_2_4ghz_primary_1_channel"]
-    eth0 = sensors["ethernet_eth0_2_current_bitrate"]
-    eth3 = sensors["ethernet_eth3_3_current_bitrate"]
+    eth0 = sensors["ethernet_eth0_3_current_bitrate"]
+    eth3 = sensors["ethernet_eth3_4_current_bitrate"]
 
     assert primary.native_value == 6
     assert primary.extra_state_attributes == {
@@ -323,4 +344,6 @@ async def test_lan_diagnostic_sensors_are_created(
     eth3_attrs = eth3.extra_state_attributes
     assert eth3_attrs is not None
     assert eth3_attrs["port_state"] == "disabled"
-    assert "ethernet_living_room_1_4_current_bitrate" not in sensors
+    assert "wifi_2_4ghz_2_channel" not in sensors
+    assert "ethernet_eth0_5_current_bitrate" not in sensors
+    assert "ethernet_living_room_1_6_current_bitrate" not in sensors

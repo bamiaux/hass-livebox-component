@@ -118,10 +118,18 @@ def _is_physical_ethernet_interface(item: dict[str, Any]) -> bool:
     if item.get("type") != "Ethernet":
         return False
     name = item.get("name", "")
-    if not isinstance(name, str) or not name.upper().startswith("ETH"):
+    if not isinstance(name, str) or not name.startswith("ETH"):
         return False
     extra_attributes = item.get("extra_attributes", {})
     return isinstance(extra_attributes.get("current_bitrate"), (int, float))
+
+
+def _is_named_wireless_interface(item: dict[str, Any]) -> bool:
+    """Return whether a LAN item looks like a named Wi-Fi interface."""
+    if item.get("type") != "Wireless":
+        return False
+    name = item.get("name", "")
+    return isinstance(name, str) and "()" not in name
 
 
 def _get_wireless_device_value_fn(
@@ -484,7 +492,7 @@ async def async_setup_entry(
             name = "Unknown"
         key = _normalize_lan_key(name, index)
 
-        if item.get("type") == "Wireless":
+        if _is_named_wireless_interface(item):
             lan_diagnostics.append(
                 LiveboxSensorEntityDescription(
                     key=f"wifi_{key}_channel",
